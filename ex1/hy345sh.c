@@ -4,7 +4,7 @@
  * @brief A simple shell implementation in C
  */
 
- #include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -56,7 +56,7 @@ void prompt(){
 int main(){
     char *input;
     while(1){
-        promt();
+        prompt();
         input = readline();
         printf("You entered: %s", input);//for testing purposes
         free(input);
