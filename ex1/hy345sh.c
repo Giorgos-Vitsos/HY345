@@ -34,6 +34,23 @@ char *readline(){
 
 }
 
+char **tokenize(char *input){
+    char **tokens;
+    int i=0;
+    tokens=malloc(64 * sizeof(char*));
+    if(!tokens){
+        printf("Error\n");
+    }
+    char *token=strtok(input, " \n\t\a\r");
+    while(token!=NULL){
+        tokens[i]=token;
+        i++;
+        token=strtok(NULL, " \n\t\a\r");
+    }
+    tokens[i]=NULL;
+    return tokens;
+}
+
 /*This function prints the promt*/
 void prompt(){
 
@@ -55,12 +72,16 @@ void prompt(){
 
 int main(){
     char *input;
-    while(1){
-        prompt();
-        input = readline();
-        printf("You entered: %s", input);//for testing purposes
+    char **args;
+    prompt();
+    while((input=readline())){ 
+        args=tokenize(input);
+         for (int i = 0; args[i] != NULL; i++) {
+            printf("Token[%d]: %s\n", i, args[i]);
+        }
+
+        free(args); 
         free(input);
-
-
+        prompt();
     }
 }
