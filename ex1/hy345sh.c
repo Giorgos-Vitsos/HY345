@@ -9,14 +9,21 @@
 #include <unistd.h>
 #include <string.h>
 
+int my_cd(char **args);
+int my_help(char **args);
+int my_exit(char **args);
+int my_echo(char **args);
+int my_pwd(char **args);
+int my_env(char **args);
+
 typedef struct{
     char *name;
     int (*func)(char **);
 } buildin;
 
 buildin builtins[] = {
-    {"cd", NULL},
-    {"help", NULL},
+    {"cd", my_cd},
+    {"help", my_help},
     {"exit", NULL},
     {"echo", NULL},
     {"pwd", NULL},
@@ -86,9 +93,41 @@ void prompt(){
 }
 
 void execute(char **args){
+    char *current;
+    int i=0;
+    while(current=builtins[i].name){
+        if(strcmp(args[0], current)==0){
+            if(builtins[i].func!=NULL){
+                builtins[i].func(args);
+            }
+            return;
+        }
+        i++;
+    }
 
 
 }
+
+int my_cd(char **args){
+    if(args[1]==NULL){
+        printf("Expected argument after cd\n");  
+    }else{
+        if(chdir(args[1])){
+            printf("No such file or directory\n");
+        }
+    }
+    return 1;
+}
+
+int my_help(char **args){
+    printf("The built-in commands are:\n");
+    for(int i=0; builtins[i].name!=NULL; i++){
+        printf("• %s\n", builtins[i].name);
+    }
+
+}
+
+
 
 int main(){
     char *input;
@@ -96,9 +135,7 @@ int main(){
     prompt();
     while((input=readline())){ 
         args=tokenize(input);
-         for (int i = 0; args[i] != NULL; i++) {
-            printf("Token[%d]: %s\n", i, args[i]);
-        }
+        execute(args);
 
         free(args); 
         free(input);
