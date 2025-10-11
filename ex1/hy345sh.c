@@ -9,6 +9,21 @@
 #include <unistd.h>
 #include <string.h>
 
+typedef struct{
+    char *name;
+    int (*func)(char **);
+} buildin;
+
+buildin builtins[] = {
+    {"cd", NULL},
+    {"help", NULL},
+    {"exit", NULL},
+    {"echo", NULL},
+    {"pwd", NULL},
+    {"env", NULL},
+    {NULL, NULL}
+};
+
 /*This function reads the input*/
 char *readline(){
 
@@ -67,6 +82,11 @@ void prompt(){
     #endif
 
     printf("<%s>@<csd5369>-hy345sh:<%s>$", user, dir);
+
+}
+
+void execute(char **args){
+
 
 }
 
