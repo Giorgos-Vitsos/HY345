@@ -74,7 +74,7 @@ void prompt(){
     #ifdef _WIN32
         strcpy(user, "csd5369");
     #else
-        getlogin_r(user, sizeof(user));//only on linux systems  
+        strcpy(user,getenv("USER"));
     #endif
 
     printf("<%s>@<csd5369>-hy345sh:<%s>$", user, dir);
