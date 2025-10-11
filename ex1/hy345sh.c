@@ -8,23 +8,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include "builtin.h"
 
-int my_cd(char **args);
-int my_help(char **args);
-int my_exit(char **args);
-int my_echo(char **args);
-int my_pwd(char **args);
-int my_env(char **args);
-
-typedef struct{
-    char *name;
-    int (*func)(char **);
-} buildin;
-
-buildin builtins[] = {
+builtin builtins[] = {
     {"cd", my_cd},
     {"help", my_help},
-    {"exit", NULL},
+    {"exit", my_exit},
     {"echo", NULL},
     {"pwd", NULL},
     {"env", NULL},
@@ -107,26 +96,6 @@ void execute(char **args){
 
 
 }
-
-int my_cd(char **args){
-    if(args[1]==NULL){
-        printf("Expected argument after cd\n");  
-    }else{
-        if(chdir(args[1])){
-            printf("No such file or directory\n");
-        }
-    }
-    return 1;
-}
-
-int my_help(char **args){
-    printf("The built-in commands are:\n");
-    for(int i=0; builtins[i].name!=NULL; i++){
-        printf("• %s\n", builtins[i].name);
-    }
-
-}
-
 
 
 int main(){
