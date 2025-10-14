@@ -3,5 +3,6 @@
         "*.py": "python",
         "*.txt": "plaintext",
         "string.h": "c"
-    }
+    },
+    "peacock.remoteColor": "#832561"
 }
