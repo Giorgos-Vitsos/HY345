@@ -4,6 +4,7 @@
 #include <string.h>
 #include "builtin.h"
 
+/*This function implements cd*/
 int my_cd(char **args){
     if(args[1]==NULL){
         printf("Expected argument after cd\n");  
@@ -15,6 +16,7 @@ int my_cd(char **args){
     return 1;
 }
 
+/*This function implements help*/
 int my_help(char **args){
     printf("The built-in commands are:\n");
     for(int i=0; builtins[i].name!=NULL; i++){
@@ -23,6 +25,7 @@ int my_help(char **args){
 
 }
 
+/*This function implements exit*/
 int my_exit(char **args){
     printf("Exiting hy345sh...\n");
     exit(0);
