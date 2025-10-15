@@ -19,6 +19,14 @@ builtin builtins[] = {
     {NULL, NULL}
 };
 
+typedef struct {
+    char *name;
+    char *value;
+} variable;
+
+variable variables[100];
+int var_count = 0;
+
 /*This function reads the input*/
 char *readline(){
 
@@ -51,11 +59,11 @@ char **tokenize(char *input){
     if(!tokens){
         printf("Error\n");
     }
-    char *token=strtok(input, " ;\n\t\a\r");
+    char *token=strtok(input, " \n\t\a\r");
     while(token!=NULL){
         tokens[i]=token;
         i++;
-        token=strtok(NULL, " ;\n\t\a\r");
+        token=strtok(NULL, " \n\t\a\r");
     }
     tokens[i]=NULL;
     return tokens;
@@ -80,9 +88,35 @@ void prompt(){
 
 }
 
+void set_var(char *name,char *value){
+    if(var_count==100){
+        printf("Variable limit reached\n");
+        return;
+    }else{
+        variables[var_count].name=name;
+        variables[var_count].value=value;
+        var_count++;
+    }
+}
+
+int check_var(char *args){
+    if(strchr(args, '=')!=NULL){
+        char *name=strtok(args, "=");
+        char *value=strtok(NULL, "=");
+        set_var(name, value);
+        return 1;
+    }
+    return 0;
+}
+
+
+
 void execute(char **args){
     char *current;
     int i=0;
+    if(check_var(args[0])){
+        return;
+    }
     while(current=builtins[i].name){
         if(strcmp(args[0], current)==0){
             if(builtins[i].func!=NULL){
@@ -121,6 +155,9 @@ char **split_commands(char  *input){
     return tokens;
 }
 
+
+
+
 int main(){
     char *input;
     char **args;
@@ -128,6 +165,9 @@ int main(){
     prompt();
     while((input=readline())){ 
         cmds=split_commands(input);
+        for(int i=0; cmds[i]!=NULL; i++){
+            printf("Command %d: %s\n", i+1, cmds[i]);
+        }
 
         for(int i=0; cmds[i]!=NULL; i++){
             args=tokenize(cmds[i]);
