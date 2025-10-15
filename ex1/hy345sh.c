@@ -214,6 +214,40 @@ void execute(char **args){
     }
 }
 
+int pipe_check(char *input){
+
+    if(strchr(input, '|')!=NULL){
+
+        return 1;
+
+    }
+
+    return 0;
+
+}
+
+void execute_pipes(char *input){
+
+    int count=0;
+
+    for(int i=0; input[i]; i++){
+
+        if(input[i]=='|'){
+            count++;
+        }
+    }
+
+    int pipeRW[2*(count-1)];
+
+    for(int i=0; i<count-1; i++){
+
+        pipe(pipeRW + i*2);
+
+    }
+
+}
+
+
 /*This function splits commands by ; (very similar to tokenize)*/
 char **split_commands(char  *input){
 
@@ -253,12 +287,24 @@ int main(){
     while((input=readline())){ 
 
         cmds=split_commands(input);
+        for(int i=0; cmds[i]!=NULL; i++) {
+            printf("Command %d: %s\n", i + 1, cmds[i]);
+        }
         
         for(int i=0; cmds[i]!=NULL; i++){
 
-            args=tokenize(cmds[i]);
-            execute(args);
-            free(args);
+            if(pipe_check(cmds[i])){
+
+                execute_pipes(cmds[i]);
+
+            }else{
+
+                args=tokenize(cmds[i]);
+                execute(args);
+                free(args);
+
+            }
+            
 
         }
         
