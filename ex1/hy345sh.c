@@ -11,6 +11,7 @@
 #include "builtin.h"
 #include <sys/wait.h>
 
+char *get_var(char *name);
 
 builtin builtins[] = {
     {"cd", my_cd},
@@ -66,6 +67,19 @@ char **tokenize(char *input){
         token=strtok(NULL, " \n\t\a\r");
     }
     tokens[i]=NULL;
+
+    for(int i=0; tokens[i]!=NULL; i++){
+        if(strchr(tokens[i], '$')!=NULL){
+            char *var_name=tokens[i]+1; // Skip the '$' character
+            printf("Variable detected: %s\n", var_name);
+            char *var_value=get_var(var_name);
+            if(var_value!=NULL){
+                tokens[i]=var_value;
+            }else{
+                tokens[i]=""; // If variable not found, replace with empty string
+            }
+        }
+    }
     return tokens;
 }
 
@@ -93,10 +107,22 @@ void set_var(char *name,char *value){
         printf("Variable limit reached\n");
         return;
     }else{
-        variables[var_count].name=name;
-        variables[var_count].value=value;
+        variables[var_count].name=strdup(name);
+        variables[var_count].value=strdup(value);
         var_count++;
     }
+}
+
+char* get_var(char *name){
+    char* value;
+    for(int i=0; i<var_count; i++){
+        if(strcmp(variables[i].name, name)==0){
+            value= variables[i].value;
+            return value;
+        }
+    }
+    printf("Variable not found\n");
+    return NULL;
 }
 
 int check_var(char *args){
@@ -115,6 +141,9 @@ void execute(char **args){
     char *current;
     int i=0;
     if(check_var(args[0])){
+        printf("Variable set: %s\n", args[0]);
+        printf("Value: %s\n", get_var(args[0]));
+    
         return;
     }
     while(current=builtins[i].name){
