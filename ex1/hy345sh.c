@@ -12,6 +12,8 @@
 #include <sys/wait.h>
 
 char *get_var(char *name);
+char **split_pipes(char *input);
+void redirect(int old, int new);
 
 /*Array with named functions to loop easily*/
 builtin builtins[] = {
@@ -89,6 +91,17 @@ char **tokenize(char *input){
 
                 tokens[i]=""; 
             }
+        }
+    }
+
+    for(int i=0; tokens[i]!=NULL; i++){//remove quotes
+
+        int len=strlen(tokens[i]);//length
+
+        if(tokens[i][0]=='"' && tokens[i][len-1]=='"'){
+
+            tokens[i][len-1]='\0';
+            tokens[i]++;
         }
     }
 
@@ -183,9 +196,7 @@ void execute(char **args){
         if(strcmp(args[0], current)==0){
 
             if(builtins[i].func!=NULL){
-
                 builtins[i].func(args);
-
             }
 
             return;
@@ -199,54 +210,141 @@ void execute(char **args){
     //execute non built-in commands
     pid_t pid=fork();
 
-    if(pid<=0){//child 
+    if(pid==0){//child 
 
-        if(execvp(args[0], args)==-1){
+        if(execvp(args[0], args)==-1){//execute
             perror("Error");
+            exit(EXIT_FAILURE);
         }
-
-        exit(EXIT_FAILURE);
-
+        
     }else{//parent
 
-        int status;
-        wait(&status);
+        wait(NULL);//only waits one child
     }
 }
 
+/*This function checks if there are pipes in the input*/
 int pipe_check(char *input){
 
     if(strchr(input, '|')!=NULL){
-
         return 1;
-
     }
 
     return 0;
 
 }
 
+
+/*This function executes piped commands*/
 void execute_pipes(char *input){
 
-    int count=0;
+    char **cmds=split_pipes(input);//holds all commands
+    int count=0;//number of commands
 
-    for(int i=0; input[i]; i++){
+    for(int i=0; cmds[i]!=NULL ; i++){
+        count++;
+    }
 
-        if(input[i]=='|'){
-            count++;
+    int pipes[count][2];
+
+    for(int i=0; i<count; i++){//create pipes
+
+        pipe(pipes[i]);
+    }
+
+    pid_t pids[count];//holds all pids so that we can wait
+
+    for(int i=0; i<count; i++){//for all commands
+
+        pid_t pid;
+
+        pid=fork();
+
+        if(pid==0){//child
+
+            char **args=tokenize(cmds[i]);//split command
+
+            if(i!=0){//the first has stdin
+                redirect(pipes[i-1][0], 0);
+            }
+
+            if(i!=count-1){//the last has stdout
+                redirect(pipes[i][1], 1);
+            }
+
+            for(int j=0; j<count; j++){//close all child pipes
+
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+
+            }
+
+            if(execvp(args[0], args)==-1){//execute
+
+                perror("Error");
+                exit(EXIT_FAILURE);
+
+            }
+
+        }else{//parent process
+
+            pids[i]=pid;//store pid
+
         }
     }
 
-    int pipeRW[2*(count-1)];
+    for(int i=0; i<count; i++){//close all parent pipes
 
-    for(int i=0; i<count-1; i++){
+        close(pipes[i][0]);
+        close(pipes[i][1]);
 
-        pipe(pipeRW + i*2);
+    }
 
+    for(int i=0; i<count; i++){//wait for all children
+
+        waitpid(pids[i], NULL, 0);
+    }
+
+    free(cmds);
+}
+
+/*This function redirects input/output*/
+void redirect(int old, int new){
+
+    if(old!=new){
+        dup2(old, new);
+        close(old);
     }
 
 }
 
+/*This function split pipe commands*/
+char **split_pipes(char  *input){
+
+    char **tokens;
+    int i=0;
+    tokens=malloc(64 * sizeof(char*));
+
+    if(!tokens){
+
+        printf("Error\n");
+
+    }
+
+    char *token=strtok(input, "|");
+
+    while(token!=NULL){
+
+        tokens[i]=token;
+        i++;
+        token=strtok(NULL, "|");
+
+    }
+
+    tokens[i]=NULL;
+    return tokens;
+
+}
 
 /*This function splits commands by ; (very similar to tokenize)*/
 char **split_commands(char  *input){
@@ -286,18 +384,15 @@ int main(){
 
     while((input=readline())){ 
 
-        cmds=split_commands(input);
-        for(int i=0; cmds[i]!=NULL; i++) {
-            printf("Command %d: %s\n", i + 1, cmds[i]);
-        }
+        cmds=split_commands(input);//split by ;
         
-        for(int i=0; cmds[i]!=NULL; i++){
+        for(int i=0; cmds[i]!=NULL; i++){//for all commands
 
-            if(pipe_check(cmds[i])){
+            if(pipe_check(cmds[i])){//checks for pipes
 
                 execute_pipes(cmds[i]);
 
-            }else{
+            }else{//normal
 
                 args=tokenize(cmds[i]);
                 execute(args);
