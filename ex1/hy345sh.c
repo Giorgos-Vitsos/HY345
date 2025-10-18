@@ -10,6 +10,7 @@
 #include <string.h>
 #include "builtin.h"
 #include <sys/wait.h>
+#include <fcntl.h>
 
 char *get_var(char *name);
 char **split_pipes(char *input);
@@ -212,6 +213,10 @@ void execute(char **args){
 
     if(pid==0){//child 
 
+        if(redirect_check(args)){
+            handle_redirect(args);//handle redirections
+        }
+
         if(execvp(args[0], args)==-1){//execute
             perror("Error");
             exit(EXIT_FAILURE);
@@ -372,6 +377,76 @@ char **split_commands(char  *input){
     tokens[i]=NULL;
     return tokens;
 
+}
+
+/*This function checks for redirections*/
+int redirect_check(char **args){
+
+    for(int i=0; args[i]!=NULL; i++){
+
+        if(strcmp(args[i], ">")==0 || strcmp(args[i], ">>")==0 || strcmp(args[i], "<")==0){
+
+            return 1;
+
+        }
+        
+    }
+    return 0;
+
+}
+
+/*This function handles redirections*/
+void handle_redirect(char **args){
+
+    int in=-1;//input fd
+    int out=-1;//output fd
+
+    for(int i=0; args[i]!=NULL;){//we check all arguments 
+
+        if(strcmp(args[i], "<")==0){
+
+            in=open(args[i+1], O_RDONLY);
+
+            if(in<0){
+                perror("Error opening file");
+                exit(EXIT_FAILURE);
+            }
+            redirect(in,0);
+            for(int j=i; args[j]!=NULL; j++){//shift args left
+                args[j]=args[j+2];
+            }
+            continue;
+
+        }else if(strcmp(args[i], ">")==0){
+
+            out=open(args[i+1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+
+            if(out<0){
+                perror("Error opening file");
+                exit(EXIT_FAILURE);
+            }
+            redirect(out,1);
+            for(int j=i; args[j]!=NULL; j++){//shift args left
+                args[j]=args[j+2];
+            }
+            continue;
+        }else if(strcmp(args[i], ">>")==0){
+
+            out=open(args[i+1], O_WRONLY | O_CREAT | O_APPEND, 0644);
+
+            if(out<0){
+                perror("Error opening file");
+                exit(EXIT_FAILURE);
+            }
+            redirect(out,1);
+            for(int j=i; args[j]!=NULL; j++){//shift args left
+                args[j]=args[j+2];
+            }
+            continue;
+        }else{
+            i++;
+        } 
+    }
 }
 
 int main(){
