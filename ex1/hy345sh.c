@@ -334,102 +334,98 @@ int execute(char **args){
 /*This function checks if there are pipes in the input*/
 int pipe_check(char *input){
 
-    int toggle=0;
+    int toggle = 0;
 
-    while(*input){//if its not insde quotes
+    for (int i=0; input[i]!='\0'; i++){//we check if there are quotes
 
-        if(*input=='|'){
-
+        if (input[i]=='"'){
             toggle=!toggle;
-
-        }else if(*input=='|' && !toggle){
-
-            return 1;
-
         }
-
-        input++;
-
+        else if(input[i]=='|' && !toggle){
+            return 1;
+        }
     }
-
     return 0;
 }
 
 /*This function executes piped commands*/
-void execute_pipes(char *input){
+void execute_pipes(char *input) {
 
-    char **cmds=split_pipes(input);//holds all commands
-    int count=0;//number of commands
+    char **cmds = split_pipes(input);
+    int n=0;
 
-    for(int i=0; cmds[i]!=NULL ; i++){
+    while(cmds[n]){//count commands
 
-        count++;
-
-    }
-
-    int pipes[count][2];
-
-    for(int i=0; i<count; i++){//create pipes
-
-        pipe(pipes[i]);
+        n++;
 
     }
 
-    pid_t pids[count];//holds all pids so that we can wait
+    int pipefds[2 * (n - 1)];//create the pipes
 
-    for(int i=0; i<count; i++){//for all commands
+    for(int i = 0; i < n - 1; i++){
 
-        pid_t pid;
+        if(pipe(pipefds + i * 2) < 0){
 
-        pid=fork();
-
-        if(pid==0){//child
-
-            char **args=tokenize(cmds[i]);//split command
-
-            if(i!=0){//the first has stdin
-
-                redirect(pipes[i-1][0], 0);
-
-            }
-
-            if(i!=count-1){//the last has stdout
-
-                redirect(pipes[i][1], 1);
-
-            }
-
-            for(int j=0; j<count; j++){//close all child pipes
-
-                close(pipes[j][0]);
-                close(pipes[j][1]);
-
-            }
-
-            if(execvp(args[0], args)==-1){//execute
-
-                perror("Error");
-                exit(EXIT_FAILURE);
-
-            }
-
-        }else{//parent process
-
-            pids[i]=pid;//store pid
+            perror("pipe");//error handling
+            exit(EXIT_FAILURE);
 
         }
     }
 
-    for(int i=0; i<count; i++){//close all parent pipes
+    for(int i=0; i< n; i++){
 
-        close(pipes[i][0]);
-        close(pipes[i][1]);
+        pid_t pid=fork();
+
+        if(pid == 0){//child
+
+            if(i>0){//not the first
+
+                redirect(pipefds[(i - 1) * 2], 0);
+            
+            }
+
+            if(i<n-1){//not the last
+
+                redirect(pipefds[i * 2 + 1], 1);
+
+            }
+
+            for(int j=0; j<2 * (n-1); j++){//closes all unused
+
+                close(pipefds[j]);
+
+            }
+
+            char **args=tokenize(cmds[i]);//we get the args
+
+            if(redirect_check(args)){
+
+                handle_redirect(args);
+
+            }
+
+            execvp(args[0], args);//we execute
+            perror("execvp");
+            exit(EXIT_FAILURE);
+
+        }
+    }
+
+    for(int i=0; i<2*(n-1); i++){//parent closes all
+
+        close(pipefds[i]);
+
+    }
+    for (int i=0; i<n; i++){//waits for children
+
+        wait(NULL);
 
     }
 
-    for(int i=0; i<count; i++){//wait for all children
+    for (int i = 0; i < n; i++){//free memory
 
-        waitpid(pids[i], NULL, 0);
+        free(cmds[i]);
+
     }
 
     free(cmds);
@@ -446,31 +442,59 @@ void redirect(int old, int new){
 }
 
 /*This function split pipe commands*/
-char **split_pipes(char  *input){
+char **split_pipes(char *input) {
 
-    char **tokens;
-    int i=0;
-    tokens=malloc(64 * sizeof(char*));
+    char **cmds = malloc(64 * sizeof(char *));
+    int count = 0;
+    int toggle=0;//quote flag
+    char *start=input;
+    char *ptr=input;//current pos
 
-    if(!tokens){
+    while(*ptr){//loop until end
 
-        printf("Error\n");
+        if(*ptr=='"'){//checks for quotes
+
+            toggle = !toggle;
+
+        }else if(*ptr=='|' && !toggle){
+
+            *ptr = '\0';
+
+            while(*start==' ' || *start=='\t'){//skip white space
+
+                start++;
+
+            } 
+    
+            char *end=ptr-1;
+
+            while(end>start && (*end==' ' || *end== '\t')){//cut white space
+
+                *end--='\0';
+
+            } 
+
+            cmds[count++] = strdup(start);
+            start = ptr + 1;//next arg after |
+
+        }
+        ptr++;
+    }
+
+    while(*start==' ' || *start=='\t'){//skip white space
+
+        start++;
 
     }
 
-    char *token=strtok(input, "|");
+    if(*start!='\0'){//save final cmd
 
-    while(token!=NULL){
-
-        tokens[i]=token;
-        i++;
-        token=strtok(NULL, "|");
+        cmds[count++]=strdup(start);
 
     }
 
-    tokens[i]=NULL;
-    return tokens;
-
+    cmds[count] = NULL;//terminate
+    return cmds;
 }
 
 /*This function splits commands by ; and \n (very similar to tokenize)*/
