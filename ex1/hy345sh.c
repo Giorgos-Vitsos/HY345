@@ -70,12 +70,12 @@ char **tokenize(char *input){
         printf("Error\n");
     }
 
-    char *token=strtok(input, " \n\t\a\r");//splits the input
+    char *token=strtok(input, " \t");//splits the input
 
     while(token!=NULL){//while there are more arguments
         tokens[i]=token;//store the token
         i++;
-        token=strtok(NULL, " \n\t\a\r");//get the next token
+        token=strtok(NULL, " \t");//get the next token
     }
 
     tokens[i]=NULL;//null-terminate
@@ -377,7 +377,7 @@ char **split_commands(char  *input){
 
         }
 
-        if(input[i]==';' && toggle==0){//if we need to split
+        if((input[i]==';' || input[i]=='\n') && toggle==0){//if we need to split
 
             int len=input+i-start;//length of command
             char *cmd=malloc(len+1);
@@ -474,35 +474,119 @@ void handle_redirect(char **args){
     }
 }
 
+//Helper function for combining a 2d array to a string
+char *make_string(char **args,int start,int end){
+    int len=0;
+
+    for(int i=start;i<end;i++){
+
+        len+=strlen(args[i])+1;
+
+    }
+
+    char *string=malloc(len);
+
+    if (!string) {
+
+        perror("malloc failed");
+        return NULL;
+
+    }
+
+    string[0] = '\0'; 
+
+    for (int i = start; i < end; i++){
+
+        strcat(string, args[i]);
+        if(i < end - 1){
+            strcat(string, " ");
+        }
+    }
+
+    return string;
+}
+
+void print_escaped(const char *str) {
+    for (int i = 0; str[i] != '\0'; i++) {
+        switch (str[i]) {
+            case '\n': printf("\\n"); break;
+            case '\t': printf("\\t"); break;
+            case '\r': printf("\\r"); break;
+            case '\a': printf("\\a"); break;
+            case '\"': printf("\\\""); break;
+            case '\\': printf("\\\\"); break;
+            default: putchar(str[i]);
+        }
+    }
+    printf("\n");
+}
+
+int matches_key(const char *line, const char *key) {
+    // Skip leading whitespace
+    while (*line == ' ' || *line == '\t') line++;
+
+    size_t key_len = strlen(key);
+
+    // Compare key characters
+    for (size_t i = 0; i < key_len; i++) {
+        if (line[i] != key[i]) return 0;
+    }
+
+    // After key, only allow whitespace or newline
+    for (size_t i = key_len; line[i] != '\0'; i++) {
+        if (line[i] != ' ' && line[i] != '\t' && line[i] != '\n' && line[i] != '\r') 
+            return 0;
+    }
+
+    return 1;  // matches
+}
+
 void handle_if(char *cmd){
     char **args;
     int found_then=-1;
     int found_fi=-1;
     int status;
+    char **cmds=split_commands(cmd);
+
+    for (int i = 0; cmds[i] != NULL; i++) {
+    printf("Command %d: ", i);
+    for (char *p = cmds[i]; *p; p++) {
+        if (*p == '\n') printf("\\n");
+        else if (*p == '\t') printf("\\t");
+        else printf("%c", *p);
+    }
+    printf("\n");
+}
 
 
-    args=tokenize(cmd);
-    for(int i=0; args[i]!=NULL; i++){
-        if(strcmp(args[i], "then")==0){
+    for (int i = 0; cmds[i] != NULL; i++){
+        if(matches_key(cmds[i],"then")){
             found_then=i;
-        }
-        if(strcmp(args[i], "fi")==0){
-            found_fi=i;
+        }else if (matches_key(cmds[i],"fi")) {
+            found_fi = i;
         }
     }
-    if((found_then==-1) || (found_fi==-1)){
+
+    if (found_then == -1 || found_fi == -1) {
         printf("Error: the syntax is wrong\n");
         return;
-    }else{
-        args[found_then]=NULL;
-        args[found_fi]=NULL;
-        
-        status=execute(&args[1]);//execute condition
-        if(status==0){
-            execute(&args[found_then+1]);
-        }
-        free(args);     
     }
+
+    cmds[found_fi]=NULL;//terminate at fi
+
+    char **condition=tokenize(cmds[0]);//with if
+    status=execute(&condition[1]);
+    if(status==0){
+        for(int i=2; cmds[i]!=NULL; i++){
+            args=tokenize(cmds[i]);
+            execute(args);
+            free(args);
+        }
+    }
+    for (int i = 0; cmds[i] != NULL; i++){
+        free(cmds[i]);
+    }
+    free(cmds);
 }
 
 void handle_for(char *cmd){
@@ -515,6 +599,7 @@ void handle_for(char *cmd){
         printf("Arg %d: %s\n", i, args[i]);
     }
 }
+
 
 char *flow_gather(char *input,char *key){
 
@@ -529,10 +614,11 @@ char *flow_gather(char *input,char *key){
             block = realloc(block, strlen(block) + strlen(line) + 2);
             strcat(block, line);
 
-            if ((strstr(line, key) != NULL) || (strstr(line, key) != NULL)){
+            if (matches_key(line,key)){
                 break;
             }
     }
+
     return block;
 }
 
@@ -547,7 +633,7 @@ int main(){
 
         if((strncmp(input, "if", 2) == 0)){
 
-            char *block =flow_gather(input,"fi\n");
+            char *block =flow_gather(input,"fi");
             handle_if(block);
             free(block);
             prompt();
@@ -555,7 +641,7 @@ int main(){
         }
         if((strncmp(input, "for", 3) == 0)){
 
-            char *block =flow_gather(input,"done\n");
+            char *block =flow_gather(input,"done");
             handle_for(block);
             free(block);
             prompt();
@@ -563,9 +649,6 @@ int main(){
         }
 
         cmds=split_commands(input);//split by ;
-        for(int i=0; cmds[i]!=NULL; i++){
-            printf("Command %d: %s\n", i, cmds[i]);
-        }
         
         for(int i=0; cmds[i]!=NULL; i++){//for all commands
 
