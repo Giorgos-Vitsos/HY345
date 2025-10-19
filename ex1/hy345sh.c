@@ -4,19 +4,7 @@
  * @brief A simple shell implementation in C
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
 #include "builtin.h"
-#include <sys/wait.h>
-#include <fcntl.h>
-
-char *get_var(char *name);
-char **split_pipes(char *input);
-void redirect(int old, int new);
-int redirect_check(char **args);
-void handle_redirect(char **args);
 
 /*Array with named functions to loop easily*/
 builtin builtins[] = {
@@ -148,7 +136,7 @@ void set_var(char *name,char *value){
 
     for(int i = 0; i < var_count; i++){//check if already exists
 
-        if(strcmp(variables[i].name, name)==0){
+        if(matches_key(variables[i].name,name)){
 
             free(variables[i].value);
             variables[i].value = strdup(value);
@@ -177,7 +165,7 @@ char* get_var(char *name){
 
     for(int i=0; i<var_count; i++){//searches for the variable
 
-        if(strcmp(variables[i].name, name)==0){
+        if(matches_key(variables[i].name,name)){
 
             value= variables[i].value;
             return value;
@@ -455,6 +443,7 @@ int redirect_check(char **args){
     for(int i=0; args[i]!=NULL; i++){
 
         if(strcmp(args[i], ">")==0 || strcmp(args[i], ">>")==0 || strcmp(args[i], "<")==0){
+            printf("BIKEEE\n");
 
             return 1;
 
@@ -635,17 +624,58 @@ void handle_if(char *cmd){
 
 void handle_for(char *cmd){
 
-    char **args;
-    args=tokenize(cmd);
-    printf("Handling for statement: %s\n", cmd);
-    printf("Tokenized args:\n");
-    for(int i=0; args[i]!=NULL; i++){
-        printf("Arg %d: %s\n", i, args[i]);
+    char **cmds=split_commands(cmd);
+    int found_do=-1;//index of do
+    int found_done=-1;//index of done
+    char **tokens=tokenize(cmds[0]);//values
+    
+    for(int i=0; cmds[i]!= NULL; i++){//finds the indexes
+
+        if(matches_key(cmds[i],"do")){
+
+            found_do=i;
+
+        }else if(matches_key(cmds[i],"done")){
+
+            found_done=i;
+
+        }
+
     }
+
+    if(found_do == -1 || found_done == -1 || !matches_key(tokens[2],"in")){//error handling
+
+        printf("Error: the syntax is wrong\n");
+        return;
+
+    }
+
+    char* var=tokens[1];//the variable
+
+    for(int i=3; tokens[i]!=NULL; i++){//loop
+
+        set_var(var,tokens[i]);//we set the var
+
+        for(int j = found_do + 1; j < found_done; j++){//for all commands inside do
+
+            char *cmd_copy = strdup(cmds[j]);//copu because tokenize ruins things (spagheti code)
+            char **args = tokenize(cmd_copy);   
+            execute(args);                      
+            free(args);
+            free(cmd_copy);
+
+        }
+    }  
 }
 
 /*This function helps with flows and loop to gather the cmds*/
 char *flow_gather(char *input,char *key){
+
+    if(strstr(input, key)!=NULL){//if everything is in one line
+        
+        return strdup(input);
+
+    }
 
     char *block = strdup(input);//copy of 1st line
     char line[1024];//buffer
