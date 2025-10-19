@@ -185,13 +185,14 @@ int check_var(char *args){
 }
 
 /*This function executes the commands*/
-void execute(char **args){
+int execute(char **args){
 
     char *current;//current command
     int i=0;
+    int status=0;
 
     if(check_var(args[0])){//check if it's a variable assignment
-        return;
+        return status;
     }
 
     while(current=builtins[i].name){//cheks all built-in commands
@@ -202,7 +203,7 @@ void execute(char **args){
                 builtins[i].func(args);
             }
 
-            return;
+            return status;
 
         }
 
@@ -223,11 +224,12 @@ void execute(char **args){
             perror("Error");
             exit(EXIT_FAILURE);
         }
-        
-    }else{//parent
-
-        wait(NULL);//only waits one child
+    }else if(pid>0){
+        waitpid(pid, &status, 0);//parent waits for child
+    }else{
+        perror("Error forking");
     }
+    return WEXITSTATUS(status);
 }
 
 /*This function checks if there are pipes in the input*/
