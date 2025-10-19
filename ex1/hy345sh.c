@@ -5,7 +5,6 @@
  */
 
 #include "builtin.h"
-#include <ctype.h>
 
 /*Array with named functions to loop easily*/
 builtin builtins[] = {
