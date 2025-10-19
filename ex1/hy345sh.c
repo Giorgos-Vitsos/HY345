@@ -42,7 +42,7 @@ char *readline(){
     size_t bufsize;
 
     //error handler
-    if(getline(&buf, &bufsize, stdin) == -1){
+    if(getline(&buf, &bufsize, stdin)== -1){
 
         if(feof(stdin)){
 
@@ -65,6 +65,7 @@ char **tokenize(char *input){
     char **tokens;//array of tokens
     int i=0;
     tokens=malloc(64 * sizeof(char*));
+    int toggle=0;
 
     if(!tokens){
         printf("Error\n");
@@ -80,11 +81,32 @@ char **tokenize(char *input){
 
     tokens[i]=NULL;//null-terminate
 
+    for(int i=0; tokens[i]!=NULL; i++){//removes quotes
+
+        char *src=tokens[i];
+        char *dst=tokens[i];
+
+        while(*src){
+
+            if(*src !='"'){
+
+                *dst=*src;
+                dst++;
+
+            }
+
+            src++;
+        }
+
+        *dst='\0';
+
+    }
+
     for(int i=0; tokens[i]!=NULL; i++){//search all tokens
 
         if(strchr(tokens[i], '$')!=NULL){//if one is a variable
 
-            char *var_value=get_var(tokens[i]+1);
+            char *var_value=get_var(tokens[i]+1);//we get the value
 
             if(var_value!=NULL){
 
@@ -93,18 +115,8 @@ char **tokenize(char *input){
             }else{//if the variable does not exist
 
                 tokens[i]=""; 
+
             }
-        }
-    }
-
-    for(int i=0; tokens[i]!=NULL; i++){//remove quotes
-
-        int len=strlen(tokens[i]);//length
-
-        if(tokens[i][0]=='"' && tokens[i][len-1]=='"'){
-
-            tokens[i][len-1]='\0';
-            tokens[i]++;
         }
     }
 
@@ -134,13 +146,23 @@ void prompt(){
 /*Functions to set variables*/                                                          
 void set_var(char *name,char *value){
 
+    for(int i = 0; i < var_count; i++){//check if already exists
+
+        if(strcmp(variables[i].name, name)==0){
+
+            free(variables[i].value);
+            variables[i].value = strdup(value);
+            return;
+        }
+    }
+
     if(var_count==100){
 
         printf("Variable limit reached\n");
         return;
 
-    }else{
-
+    }else{//sets variable
+        
         variables[var_count].name=strdup(name);
         variables[var_count].value=strdup(value);
         var_count++;
@@ -168,7 +190,7 @@ char* get_var(char *name){
 
 }
 
-/*Function to check if the input is a variable assignment*/
+/*Function to check if the input is a variable assignment and set it*/
 int check_var(char *args){
 
     if(strchr(args, '=')!=NULL){
@@ -191,8 +213,11 @@ int execute(char **args){
     int i=0;
     int status=0;
 
+
     if(check_var(args[0])){//check if it's a variable assignment
+
         return status;
+
     }
 
     while(current=builtins[i].name){//cheks all built-in commands
@@ -200,7 +225,9 @@ int execute(char **args){
         if(strcmp(args[0], current)==0){
 
             if(builtins[i].func!=NULL){
+
                 builtins[i].func(args);
+
             }
 
             return status;
@@ -217,18 +244,28 @@ int execute(char **args){
     if(pid==0){//child 
 
         if(redirect_check(args)){
+
             handle_redirect(args);//handle redirections
+
         }
 
         if(execvp(args[0], args)==-1){//execute
+
             perror("Error");
             exit(EXIT_FAILURE);
+
         }
+
     }else if(pid>0){
+
         waitpid(pid, &status, 0);//parent waits for child
+
     }else{
+
         perror("Error forking");
+
     }
+
     return WEXITSTATUS(status);
 }
 
@@ -251,7 +288,9 @@ void execute_pipes(char *input){
     int count=0;//number of commands
 
     for(int i=0; cmds[i]!=NULL ; i++){
+
         count++;
+
     }
 
     int pipes[count][2];
@@ -259,6 +298,7 @@ void execute_pipes(char *input){
     for(int i=0; i<count; i++){//create pipes
 
         pipe(pipes[i]);
+
     }
 
     pid_t pids[count];//holds all pids so that we can wait
@@ -274,11 +314,15 @@ void execute_pipes(char *input){
             char **args=tokenize(cmds[i]);//split command
 
             if(i!=0){//the first has stdin
+
                 redirect(pipes[i-1][0], 0);
+
             }
 
             if(i!=count-1){//the last has stdout
+
                 redirect(pipes[i][1], 1);
+
             }
 
             for(int j=0; j<count; j++){//close all child pipes
@@ -355,7 +399,7 @@ char **split_pipes(char  *input){
 
 }
 
-/*This function splits commands by ; (very similar to tokenize)*/
+/*This function splits commands by ; and \n (very similar to tokenize)*/
 char **split_commands(char  *input){
 
     char **tokens=malloc(64 * sizeof(char*));//array of commands
@@ -367,6 +411,7 @@ char **split_commands(char  *input){
 
         printf("Error\n");
         return NULL;
+
     }
 
     for(int i=0; input[i]!='\0'; i++){
@@ -416,6 +461,7 @@ int redirect_check(char **args){
         }
         
     }
+
     return 0;
 
 }
@@ -430,163 +476,161 @@ void handle_redirect(char **args){
 
         if(strcmp(args[i], "<")==0){
 
-            in=open(args[i+1], O_RDONLY);//open file
+            in=open(args[i+1], O_RDONLY);//read
 
-            if(in<0){
+            if(in<0){//error handling
+
                 perror("Error opening file");
                 exit(EXIT_FAILURE);
+
             }
-            redirect(in,0);
-            for(int j=i; args[j]!=NULL; j++){
+
+            redirect(in,0);//we change the fd
+
+            for(int j=i; args[j]!=NULL; j++){//we skip the 2 args
+
                 args[j]=args[j+2];
+
             }
+
             continue;
 
-        }else if(strcmp(args[i], ">")==0){
+        }else if(strcmp(args[i], ">")==0){//write
 
             out=open(args[i+1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
             if(out<0){
+
                 perror("Error opening file");
                 exit(EXIT_FAILURE);
+
             }
+
             redirect(out,1);
+
             for(int j=i; args[j]!=NULL; j++){
+
                 args[j]=args[j+2];
+
             }
+
             continue;
-        }else if(strcmp(args[i], ">>")==0){
+
+        }else if(strcmp(args[i], ">>")==0){//append
 
             out=open(args[i+1], O_WRONLY | O_CREAT | O_APPEND, 0644);
 
             if(out<0){
+
                 perror("Error opening file");
                 exit(EXIT_FAILURE);
+
             }
+
             redirect(out,1);
+
             for(int j=i; args[j]!=NULL; j++){
+
                 args[j]=args[j+2];
+
             }
+
             continue;
+
         }else{
-            i++;
+
+            i++;//only when its not a redirect
+
         } 
     }
 }
 
-//Helper function for combining a 2d array to a string
-char *make_string(char **args,int start,int end){
-    int len=0;
+/*Returns 1 if 2 strings match or 0 if they dont*/
+int matches_key(char *line,char *key) {
+    
+    while(*line == ' ' || *line == '\t'){//we skip spaces
 
-    for(int i=start;i<end;i++){
+        line++;
 
-        len+=strlen(args[i])+1;
-
-    }
-
-    char *string=malloc(len);
-
-    if (!string) {
-
-        perror("malloc failed");
-        return NULL;
-
-    }
-
-    string[0] = '\0'; 
-
-    for (int i = start; i < end; i++){
-
-        strcat(string, args[i]);
-        if(i < end - 1){
-            strcat(string, " ");
-        }
-    }
-
-    return string;
-}
-
-void print_escaped(const char *str) {
-    for (int i = 0; str[i] != '\0'; i++) {
-        switch (str[i]) {
-            case '\n': printf("\\n"); break;
-            case '\t': printf("\\t"); break;
-            case '\r': printf("\\r"); break;
-            case '\a': printf("\\a"); break;
-            case '\"': printf("\\\""); break;
-            case '\\': printf("\\\\"); break;
-            default: putchar(str[i]);
-        }
-    }
-    printf("\n");
-}
-
-int matches_key(const char *line, const char *key) {
-    // Skip leading whitespace
-    while (*line == ' ' || *line == '\t') line++;
+    } 
 
     size_t key_len = strlen(key);
 
-    // Compare key characters
-    for (size_t i = 0; i < key_len; i++) {
-        if (line[i] != key[i]) return 0;
-    }
+    for(size_t i = 0; i < key_len; i++){//compares characters
 
-    // After key, only allow whitespace or newline
-    for (size_t i = key_len; line[i] != '\0'; i++) {
-        if (line[i] != ' ' && line[i] != '\t' && line[i] != '\n' && line[i] != '\r') 
+        if(line[i] != key[i]){
             return 0;
+        }
+
     }
 
-    return 1;  // matches
+    
+    for(size_t i= key_len; line[i] != '\0'; i++){//after matching it tests the rest
+
+        if(line[i] != ' ' && line[i] != '\t' && line[i] != '\n' && line[i] != '\r'){
+
+            return 0;
+
+        }       
+    }
+
+    return 1;
+
 }
 
+/*This function handles flow*/
 void handle_if(char *cmd){
+
     char **args;
-    int found_then=-1;
-    int found_fi=-1;
+    int found_then=-1;//index of then
+    int found_fi=-1;//index of fi
     int status;
     char **cmds=split_commands(cmd);
 
-    for (int i = 0; cmds[i] != NULL; i++) {
-    printf("Command %d: ", i);
-    for (char *p = cmds[i]; *p; p++) {
-        if (*p == '\n') printf("\\n");
-        else if (*p == '\t') printf("\\t");
-        else printf("%c", *p);
-    }
-    printf("\n");
-}
+    for(int i = 0; cmds[i] != NULL; i++){//searches for fi and then
 
-
-    for (int i = 0; cmds[i] != NULL; i++){
         if(matches_key(cmds[i],"then")){
+
             found_then=i;
-        }else if (matches_key(cmds[i],"fi")) {
+
+        }else if(matches_key(cmds[i],"fi")){
+
             found_fi = i;
+
         }
     }
 
-    if (found_then == -1 || found_fi == -1) {
+    if(found_then == -1 || found_fi == -1){
+
         printf("Error: the syntax is wrong\n");
         return;
+
     }
 
     cmds[found_fi]=NULL;//terminate at fi
 
     char **condition=tokenize(cmds[0]);//with if
-    status=execute(&condition[1]);
-    if(status==0){
+    
+    status = execute(&condition[1]);//skips if and executes condition
+
+    if(status==0){//if valid
+
         for(int i=2; cmds[i]!=NULL; i++){
+
             args=tokenize(cmds[i]);
             execute(args);
             free(args);
+
         }
     }
+
     for (int i = 0; cmds[i] != NULL; i++){
+
         free(cmds[i]);
     }
+
     free(cmds);
+
 }
 
 void handle_for(char *cmd){
@@ -600,29 +644,37 @@ void handle_for(char *cmd){
     }
 }
 
-
+/*This function helps with flows and loop to gather the cmds*/
 char *flow_gather(char *input,char *key){
 
-    char *block = strdup(input);
-    char line[1024];
+    char *block = strdup(input);//copy of 1st line
+    char line[1024];//buffer
 
-    while (1){
-            printf("> ");
-            if (!fgets(line, sizeof(line), stdin))
-                break;
+    while(1){
 
-            block = realloc(block, strlen(block) + strlen(line) + 2);
-            strcat(block, line);
+        printf("> ");
 
-            if (matches_key(line,key)){
-                break;
-            }
+        if(!fgets(line, sizeof(line), stdin)){//stops at EOF
+
+            break;
+
+        }
+
+        block = realloc(block, strlen(block) + strlen(line) + 2);//we add the new line with extra space
+        strcat(block, line);
+
+        if (matches_key(line,key)){//if fi or done is typed we exit
+
+            break;
+
+        }
     }
 
     return block;
 }
 
 int main(){
+    
     char *input;
     char **args;
     char **cmds;
