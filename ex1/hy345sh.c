@@ -15,6 +15,8 @@
 char *get_var(char *name);
 char **split_pipes(char *input);
 void redirect(int old, int new);
+int redirect_check(char **args);
+void handle_redirect(char **args);
 
 /*Array with named functions to loop easily*/
 builtin builtins[] = {
@@ -405,14 +407,14 @@ void handle_redirect(char **args){
 
         if(strcmp(args[i], "<")==0){
 
-            in=open(args[i+1], O_RDONLY);
+            in=open(args[i+1], O_RDONLY);//open file
 
             if(in<0){
                 perror("Error opening file");
                 exit(EXIT_FAILURE);
             }
             redirect(in,0);
-            for(int j=i; args[j]!=NULL; j++){//shift args left
+            for(int j=i; args[j]!=NULL; j++){
                 args[j]=args[j+2];
             }
             continue;
@@ -426,7 +428,7 @@ void handle_redirect(char **args){
                 exit(EXIT_FAILURE);
             }
             redirect(out,1);
-            for(int j=i; args[j]!=NULL; j++){//shift args left
+            for(int j=i; args[j]!=NULL; j++){
                 args[j]=args[j+2];
             }
             continue;
@@ -439,7 +441,7 @@ void handle_redirect(char **args){
                 exit(EXIT_FAILURE);
             }
             redirect(out,1);
-            for(int j=i; args[j]!=NULL; j++){//shift args left
+            for(int j=i; args[j]!=NULL; j++){
                 args[j]=args[j+2];
             }
             continue;
@@ -447,6 +449,68 @@ void handle_redirect(char **args){
             i++;
         } 
     }
+}
+
+void handle_if(char *cmd){
+    char **args;
+    char **condition;
+    int found_then=-1;
+    int found_fi=-1;
+
+    args=tokenize(cmd+3);
+    for(int i=0; args[i]!=NULL; i++){
+        if(strcmp(args[i], "then")==0){
+            found_then=i;
+        }
+        if(strcmp(args[i], "fi")==0){
+            found_fi=i;
+        }
+    }
+    if((found_then==-1) || (found_fi==-1)){
+        printf("Error: the syntax is wrong\n");
+        return;
+    }else{
+        args[found_then]=NULL;
+        args[found_fi]=NULL;
+        condition=args;
+        for(int i=0; condition[i]!=NULL; i++){
+            printf("Condition Arg %d: %s\n", i, condition[i]);
+        }
+        for(int i=found_then+1; args[i]!=NULL; i++){
+            printf("If Body Arg %d: %s\n", i-(found_then+1), args[i]);
+        }
+    }
+}
+
+void handle_for(char *cmd){
+
+    char **args;
+    args=tokenize(cmd);
+    printf("Handling for statement: %s\n", cmd);
+    printf("Tokenized args:\n");
+    for(int i=0; args[i]!=NULL; i++){
+        printf("Arg %d: %s\n", i, args[i]);
+    }
+}
+
+char *flow_gather(char *input,char *key){
+
+    char *block = strdup(input);
+    char line[1024];
+
+    while (1){
+            printf("> ");
+            if (!fgets(line, sizeof(line), stdin))
+                break;
+
+            block = realloc(block, strlen(block) + strlen(line) + 2);
+            strcat(block, line);
+
+            if ((strstr(line, key) != NULL) || (strstr(line, key) != NULL)){
+                break;
+            }
+    }
+    return block;
 }
 
 int main(){
@@ -457,7 +521,24 @@ int main(){
 
     prompt();
 
-    while((input=readline())){ 
+    while((input=readline())){
+
+        if((strncmp(input, "if", 2) == 0)){
+
+            char *block =flow_gather(input,"fi");
+            handle_if(block);
+            free(block);
+            prompt();
+            continue;
+        }
+        if((strncmp(input, "for", 3) == 0)){
+
+            char *block =flow_gather(input,"done");
+            handle_for(block);
+            free(block);
+            prompt();
+            continue;
+        }
 
         cmds=split_commands(input);//split by ;
         
@@ -474,8 +555,6 @@ int main(){
                 free(args);
 
             }
-            
-
         }
         
         free(cmds); 
