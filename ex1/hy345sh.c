@@ -5,6 +5,7 @@
  */
 
 #include "builtin.h"
+#include <ctype.h>
 
 /*Array with named functions to loop easily*/
 builtin builtins[] = {
@@ -48,68 +49,78 @@ char *readline(){
 }
 
 /*This function tokenizes the input*/
-char **tokenize(char *input){
+char **tokenize(char *input) {
 
-    char **tokens;//array of tokens
-    int i=0;
-    tokens=malloc(64 * sizeof(char*));
-    int toggle=0;
+    char **tokens = malloc(64 * sizeof(char*));//space for the tokens
+    int i = 0;
 
-    if(!tokens){
+    if(!tokens){//error handler
+
         printf("Error\n");
+        return NULL; 
+
     }
 
-    char *token=strtok(input, " \t");//splits the input
+    int len = strlen(input);
+    for (int j = 0; j < len;) {
+        if (input[j] == ' ' || input[j] == '\t') { j++; continue; }
 
-    while(token!=NULL){//while there are more arguments
-        tokens[i]=token;//store the token
-        i++;
-        token=strtok(NULL, " \t");//get the next token
-    }
-
-    tokens[i]=NULL;//null-terminate
-
-    for(int i=0; tokens[i]!=NULL; i++){//removes quotes
-
-        char *src=tokens[i];
-        char *dst=tokens[i];
-
-        while(*src){
-
-            if(*src !='"'){
-
-                *dst=*src;
-                dst++;
-
+        // Handle redirections
+        if (input[j] == '<' || input[j] == '>') {
+            if (input[j] == '>' && input[j+1] == '>') {
+                tokens[i++] = strdup(">>"); j += 2;
+            } else {
+                char op[2] = {input[j], '\0'};
+                tokens[i++] = strdup(op); j++;
             }
+            continue;
+        }
 
+        // Regular word with quote handling
+        int start = j;
+        int toggle = 0;
+        while (j < len && (toggle || (input[j] != ' ' && input[j] != '\t' && input[j] != '<' && input[j] != '>'))) {
+            if (input[j] == '"') toggle = !toggle;
+            j++;
+        }
+
+        int word_len = j - start;
+        char *word = malloc(word_len + 1);
+        strncpy(word, input + start, word_len);
+        word[word_len] = '\0';
+
+        // Remove quotes
+        char *src = word, *dst = word;
+        while (*src) {
+            if (*src != '"') *dst++ = *src;
             src++;
         }
+        *dst = '\0';
 
-        *dst='\0';
-
-    }
-
-    for(int i=0; tokens[i]!=NULL; i++){//search all tokens
-
-        if(strchr(tokens[i], '$')!=NULL){//if one is a variable
-
-            char *var_value=get_var(tokens[i]+1);//we get the value
-
-            if(var_value!=NULL){
-
-                tokens[i]=var_value;//we replace it with its value
-
-            }else{//if the variable does not exist
-
-                tokens[i]=""; 
-
+        // Expand variables: support multiple $VARs in one token
+        char buffer[1024] = {0};
+        char *p = word;
+        char *b = buffer;
+        while (*p) {
+            if (*p == '$') {
+                p++;
+                char varname[128] = {0};
+                int k = 0;
+                while (*p && (isalnum(*p) || *p=='_')) varname[k++] = *p++;
+                varname[k] = '\0';
+                char *val = get_var(varname);
+                if (val) { strcpy(b, val); b += strlen(val); }
+            } else {
+                *b++ = *p++;
             }
         }
+        *b = '\0';
+        free(word);
+        tokens[i++] = strdup(buffer);
     }
 
+    tokens[i] = NULL;
     return tokens;
-
 }
 
 /*This function prints the promt*/
@@ -178,19 +189,36 @@ char* get_var(char *name){
 
 }
 
-/*Function to check if the input is a variable assignment and set it*/
+/*Checks if we have a variable and sets it*/
 int check_var(char *args){
 
-    if(strchr(args, '=')!=NULL){
+    char *eq=strchr(args, '=');//finds =
 
-        char *name=strtok(args, "=");
-        char *value=strtok(NULL, "=");
-        set_var(name, value);
-        return 1;
+    if(!eq){//if not variable
+        return 0;
+    }
+
+    *eq = '\0';//we delete =
+    char *name=args;
+    char *value=eq+1;//value starts after =
+
+    char *src = value;//we delete the quotes
+    char *dst = value;
+    while(*src){
+
+        if(*src!= '"'){
+
+            *dst++=*src;
+
+        }
+
+        src++;
 
     }
 
-    return 0;
+    *dst = '\0';
+    set_var(name, value);
+    return 1;
 
 }
 
@@ -441,14 +469,15 @@ char **split_commands(char  *input){
 int redirect_check(char **args){
 
     for(int i=0; args[i]!=NULL; i++){
-
-        if(strcmp(args[i], ">")==0 || strcmp(args[i], ">>")==0 || strcmp(args[i], "<")==0){
-            printf("BIKEEE\n");
-
-            return 1;
-
-        }
         
+        for(int j=0; args[i][j]!='\0'; j++){
+
+            if(args[i][j]=='<' || args[i][j]=='>'){
+
+                return 1;
+
+            }
+        }
     }
 
     return 0;
@@ -460,6 +489,7 @@ void handle_redirect(char **args){
 
     int in=-1;//input fd
     int out=-1;//output fd
+    char *filename;
 
     for(int i=0; args[i]!=NULL;){//we check all arguments 
 
