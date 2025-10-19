@@ -358,27 +358,48 @@ char **split_pipes(char  *input){
 /*This function splits commands by ; (very similar to tokenize)*/
 char **split_commands(char  *input){
 
-    char **tokens;
-    int i=0;
-    tokens=malloc(64 * sizeof(char*));
+    char **tokens=malloc(64 * sizeof(char*));//array of commands
+    int toggle=0;//flag for quotes
+    char *start=input;//start of current command
+    int count=0;//num of commands
 
     if(!tokens){
 
         printf("Error\n");
+        return NULL;
+    }
+
+    for(int i=0; input[i]!='\0'; i++){
+
+        if(input[i]=='"'){//toggle quotes
+
+            toggle=!toggle;
+
+        }
+
+        if(input[i]==';' && toggle==0){//if we need to split
+
+            int len=input+i-start;//length of command
+            char *cmd=malloc(len+1);
+            strncpy(cmd, start, len);//copy command
+            cmd[len]='\0';
+            tokens[count]=cmd;//store command
+            count++;
+            start=input+i+1;//move start to next command
+
+        }
+    }
+
+    if (*start != '\0'){//command without ; at the end
+
+        int len = strlen(start);
+        char *cmd = malloc(len + 1);
+        strcpy(cmd, start);
+        tokens[count++] = cmd;
 
     }
 
-    char *token=strtok(input, ";");
-
-    while(token!=NULL){
-
-        tokens[i]=token;
-        i++;
-        token=strtok(NULL, ";");
-
-    }
-
-    tokens[i]=NULL;
+    tokens[count]=NULL;
     return tokens;
 
 }
@@ -455,11 +476,12 @@ void handle_redirect(char **args){
 
 void handle_if(char *cmd){
     char **args;
-    char **condition;
     int found_then=-1;
     int found_fi=-1;
+    int status;
 
-    args=tokenize(cmd+3);
+
+    args=tokenize(cmd);
     for(int i=0; args[i]!=NULL; i++){
         if(strcmp(args[i], "then")==0){
             found_then=i;
@@ -474,13 +496,12 @@ void handle_if(char *cmd){
     }else{
         args[found_then]=NULL;
         args[found_fi]=NULL;
-        condition=args;
-        for(int i=0; condition[i]!=NULL; i++){
-            printf("Condition Arg %d: %s\n", i, condition[i]);
+        
+        status=execute(&args[1]);//execute condition
+        if(status==0){
+            execute(&args[found_then+1]);
         }
-        for(int i=found_then+1; args[i]!=NULL; i++){
-            printf("If Body Arg %d: %s\n", i-(found_then+1), args[i]);
-        }
+        free(args);     
     }
 }
 
@@ -516,7 +537,6 @@ char *flow_gather(char *input,char *key){
 }
 
 int main(){
-
     char *input;
     char **args;
     char **cmds;
@@ -527,7 +547,7 @@ int main(){
 
         if((strncmp(input, "if", 2) == 0)){
 
-            char *block =flow_gather(input,"fi");
+            char *block =flow_gather(input,"fi\n");
             handle_if(block);
             free(block);
             prompt();
@@ -535,7 +555,7 @@ int main(){
         }
         if((strncmp(input, "for", 3) == 0)){
 
-            char *block =flow_gather(input,"done");
+            char *block =flow_gather(input,"done\n");
             handle_for(block);
             free(block);
             prompt();
@@ -543,6 +563,9 @@ int main(){
         }
 
         cmds=split_commands(input);//split by ;
+        for(int i=0; cmds[i]!=NULL; i++){
+            printf("Command %d: %s\n", i, cmds[i]);
+        }
         
         for(int i=0; cmds[i]!=NULL; i++){//for all commands
 
