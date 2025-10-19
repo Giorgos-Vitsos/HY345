@@ -404,9 +404,10 @@ void execute_pipes(char *input) {
 
             }
 
-            execvp(args[0], args);//we execute
-            perror("execvp");
-            exit(EXIT_FAILURE);
+            execute(args);  // <- Important: handles built-ins and variables
+            free(args);
+
+            exit(0); // terminate child
 
         }
     }
