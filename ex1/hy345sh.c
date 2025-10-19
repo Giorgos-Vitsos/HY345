@@ -51,8 +51,8 @@ char *readline(){
 /*This function tokenizes the input*/
 char **tokenize(char *input) {
 
-    char **tokens = malloc(64 * sizeof(char*));//space for the tokens
-    int i = 0;
+    char **tokens=malloc(64 * sizeof(char*));//space for the tokens
+    int i=0;
 
     if(!tokens){//error handler
 
@@ -61,27 +61,46 @@ char **tokenize(char *input) {
 
     }
 
-    int len = strlen(input);
-    for (int j = 0; j < len;) {
-        if (input[j] == ' ' || input[j] == '\t') { j++; continue; }
+    int len=strlen(input);
 
-        // Handle redirections
-        if (input[j] == '<' || input[j] == '>') {
-            if (input[j] == '>' && input[j+1] == '>') {
-                tokens[i++] = strdup(">>"); j += 2;
-            } else {
-                char op[2] = {input[j], '\0'};
-                tokens[i++] = strdup(op); j++;
+    for (int j=0; j<len;){
+
+        if(input[j] == ' ' || input[j] == '\t'){//we skip whitespace
+
+            j++; 
+            continue; 
+
+        }
+
+
+        if(input[j] == '<' || input[j] == '>'){//if there is a redirection
+
+            if(input[j] == '>' && input[j+1] == '>'){//we check for >>
+
+                tokens[i++]=strdup(">>"); 
+                j += 2;//we skip 2
+
+            }else{
+
+                char op[2]={input[j], '\0'};//we get the char
+                tokens[i++]=strdup(op); 
+                j++;//we skip 1
+
             }
+
             continue;
         }
 
-        // Regular word with quote handling
-        int start = j;
-        int toggle = 0;
-        while (j < len && (toggle || (input[j] != ' ' && input[j] != '\t' && input[j] != '<' && input[j] != '>'))) {
-            if (input[j] == '"') toggle = !toggle;
+        int start = j;//beggining of word
+        int toggle = 0;//for quotes
+
+        while(j < len && (toggle || (input[j] != ' ' && input[j] != '\t' && input[j] != '<' && input[j] != '>'))){//we skip
+
+            if (input[j] == '"'){
+                toggle = !toggle;
+            }
             j++;
+
         }
 
         int word_len = j - start;
@@ -89,34 +108,61 @@ char **tokenize(char *input) {
         strncpy(word, input + start, word_len);
         word[word_len] = '\0';
 
-        // Remove quotes
-        char *src = word, *dst = word;
-        while (*src) {
-            if (*src != '"') *dst++ = *src;
+        char *src = word;//we remove quotes
+        char *dst = word;
+
+        while(*src){
+
+            if(*src != '"'){
+
+                *dst++=*src;
+
+            }
+
             src++;
         }
+
         *dst = '\0';
 
-        // Expand variables: support multiple $VARs in one token
-        char buffer[1024] = {0};
+        char buffer[1024] = {0};//buffer for variables
         char *p = word;
         char *b = buffer;
-        while (*p) {
-            if (*p == '$') {
+
+        while(*p){//check each char
+
+            if(*p=='$'){
+
                 p++;
-                char varname[128] = {0};
+                char varname[128]={0};
                 int k = 0;
-                while (*p && (isalnum(*p) || *p=='_')) varname[k++] = *p++;
+
+                while(*p && (isalnum(*p) || *p=='_')){//all valid chars are copied
+
+                    varname[k++]= *p++;
+
+                }
+
                 varname[k] = '\0';
-                char *val = get_var(varname);
-                if (val) { strcpy(b, val); b += strlen(val); }
-            } else {
-                *b++ = *p++;
+                char *val = get_var(varname);//we get the value
+
+                if(val){ 
+
+                    strcpy(b, val);//copy into buffer 
+                    b+=strlen(val);//move index
+
+                }
+
+            }else{
+
+                *b++=*p++;//copy 
+
             }
         }
-        *b = '\0';
+
+        *b= '\0';
         free(word);
         tokens[i++] = strdup(buffer);
+
     }
 
     tokens[i] = NULL;
@@ -288,14 +334,26 @@ int execute(char **args){
 /*This function checks if there are pipes in the input*/
 int pipe_check(char *input){
 
-    if(strchr(input, '|')!=NULL){
-        return 1;
+    int toggle=0;
+
+    while(*input){//if its not insde quotes
+
+        if(*input=='|'){
+
+            toggle=!toggle;
+
+        }else if(*input=='|' && !toggle){
+
+            return 1;
+
+        }
+
+        input++;
+
     }
 
     return 0;
-
 }
-
 
 /*This function executes piped commands*/
 void execute_pipes(char *input){
