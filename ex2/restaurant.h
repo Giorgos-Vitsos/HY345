@@ -9,6 +9,7 @@ typedef struct{
 
     int table_capacity;
     int current_customers;
+    int table_id;
 
 } Table;
 
@@ -42,3 +43,4 @@ void destroy_restaurant();
 void *waiter_function(void *ptr);
 void *group_function(void *ptr);
 void free_table(Group* group);
+void seat_at_table(Group* group,Table* table);

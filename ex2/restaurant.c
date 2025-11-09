@@ -11,6 +11,7 @@ void init_restaurant(int num_tables, int num_groups, int table_capacity){
 
         restaurant.tables[i].table_capacity=table_capacity;
         restaurant.tables[i].current_customers=0;
+        restaurant.tables[i].table_id=i;
 
     }
 
@@ -43,11 +44,6 @@ void destroy_restaurant() {
     // Implementation of restaurant cleanup
 }
 
-
-void *waiter_function(void *ptr){
-    
-
-}
 void *group_function(void *ptr){
 
     int id=*(int*) ptr;
@@ -58,13 +54,7 @@ void *group_function(void *ptr){
 
     //waiting
     pthread_mutex_lock(&restaurant.mutex);
-    int waiting_num=0;//we find how many are waiting
-    while(restaurant.waiting_groups[waiting_num]!=-1 && waiting_num<restaurant.num_groups){
-
-        waiting_num++;   
-
-    }
-    restaurant.waiting_groups[waiting_num]=id;//we add it to the queue
+    restaurant.waiting_groups[group->group_id]=group->group_id;//we add it to the queue
     sem_post(&restaurant.w_sem);//we tell the waiter to wake up
     pthread_mutex_unlock(&restaurant.mutex);
 
@@ -93,5 +83,61 @@ void free_table(Group* group){
     restaurant.remaining_groups--;//we remove the group from the restaurant
     printf("[GROUP %d] Left Table %d (%d/%d occupied)\n",group->group_id,table_id,restaurant.tables[table_id].current_customers,restaurant.tables[table_id].table_capacity);
     sem_post(&restaurant.w_sem);
+
+}
+
+void *waiter_function(void *ptr){
+    while(1){
+
+        sem_wait(&restaurant.w_sem);
+        
+        if(restaurant.remaining_groups==0){
+
+            break;
+
+        }
+
+        
+        pthread_mutex_lock(&restaurant.mutex);
+
+        int found=0;
+        for(int i=0; i<restaurant.num_groups; i++){
+
+            if(restaurant.waiting_groups[i]==-1){
+
+                continue;
+
+            }
+            Group* group=&restaurant.groups[i];
+            for(int j=0; j<restaurant.num_tables; j++){
+
+                Table* table=&restaurant.tables[j];
+                if(table->table_capacity-table->current_customers>=group->size){
+
+                    seat_at_table(group,table);
+                    found=1;
+                    break;
+                }
+            }
+            if(found==1){
+
+                sem_post(&group->g_sem);
+                break;
+            }
+        }
+
+        pthread_mutex_unlock(&restaurant.mutex);
+        
+    }
+    return NULL;
+
+}
+
+void seat_at_table(Group* group,Table* table){
+
+    table->current_customers=table->current_customers+group->size;
+    group->table_id=table->table_id;
+    restaurant.waiting_groups[group->group_id]=-1;
+
 
 }
