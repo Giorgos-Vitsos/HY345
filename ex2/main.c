@@ -1,4 +1,9 @@
+/**
+ * @author Giorgos Vitsos (csd5369)
+ */
+
 #include "restaurant.h"
+
 
 int main(int argc, char *argv[]) {
 
