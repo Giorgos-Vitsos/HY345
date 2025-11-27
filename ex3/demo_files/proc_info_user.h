@@ -17,6 +17,7 @@ struct d_params {
     int est_runtime;  
 };
 
+//wrappers
 static inline long set_proc_info(int deadline, int est_runtime) {
     return syscall(NR_set_proc_info, deadline, est_runtime);
 }

@@ -1,3 +1,5 @@
+/*Giorgos Vitsos csd5369*/
+
 #ifndef __ASM_GENERIC_SYSCALLS_H
 #define __ASM_GENERIC_SYSCALLS_H
 
@@ -58,5 +60,9 @@ asmlinkage long sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize);
 asmlinkage long sys_rt_sigaction(int sig, const struct sigaction __user *act,
 			 struct sigaction __user *oact, size_t sigsetsize);
 #endif
+
+asmlinkage long sys_set_proc_info(int deadline, int est_runtime);
+
+asmlinkage long sys_get_proc_info(struct d_params __user *params);
 
 #endif /* __ASM_GENERIC_SYSCALLS_H */
