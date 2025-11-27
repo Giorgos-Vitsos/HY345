@@ -351,9 +351,10 @@
 #define __NR_prlimit64		340
 #define __NR_set_proc_info 341
 #define __NR_get_proc_info 342
-#define __NR_syscalls 343
+
 
 #ifdef __KERNEL__
+#define __NR_syscalls 343
 
 #define __ARCH_WANT_IPC_PARSE_VERSION
 #define __ARCH_WANT_OLD_READDIR

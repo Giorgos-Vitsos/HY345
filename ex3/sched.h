@@ -1,3 +1,5 @@
+/*Giorgos Vitsos csd5369*/
+
 #ifndef _LINUX_SCHED_H
 #define _LINUX_SCHED_H
 
@@ -49,6 +51,7 @@ struct sched_param {
 };
 
 #include <asm/param.h>	/* for HZ */
+#include <linux/proc_info.h>
 
 #include <linux/capability.h>
 #include <linux/threads.h>
