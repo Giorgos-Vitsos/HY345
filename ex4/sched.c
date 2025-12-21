@@ -4018,6 +4018,11 @@ need_resched:
 		}
 	}
 
+	if (candidate)
+    	next = candidate;
+	else
+    	next = pick_next_task(rq);
+
 	release_kernel_lock(prev);
 need_resched_nonpreemptible:
 
@@ -4057,11 +4062,7 @@ need_resched_nonpreemptible:
 		idle_balance(cpu, rq);
 
 	put_prev_task(rq, prev);
-	if(candidate){
-		next=candidate;
-	}else{
-		next=pick_next_task(rq);
-	}
+	next = pick_next_task(rq);
 	clear_tsk_need_resched(prev);
 	rq->skip_clock_update = 0;
 
