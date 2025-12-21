@@ -3964,10 +3964,10 @@ need_resched:
 		prev->time_used+=jiffies_to_msecs(djiffies);
 		prev->last_sched=jiffies;
 
-		if(p->time_used>=p->est_runtime){//if its passed estimated time
-			printk(KERN_INFO "LTF: pid=%d finished\n",p->pid);
-			p->time_used=0;
-			p->ltf_flag=0;
+		if(prev->time_used>=prev->est_runtime){//if its passed estimated time
+			printk(KERN_INFO "LTF: pid=%d finished\n",prev->pid);
+			prev->time_used=0;
+			prev->ltf_flag=0;
 
 		}else{
 			printk(KERN_INFO "LTF: pid=%d time_used=%lu ms\n",prev->pid,prev->time_used);
