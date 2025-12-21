@@ -3963,6 +3963,7 @@ need_resched:
 		unsigned long djiffies=jiffies-prev->last_sched;//updates times for ltf
 		prev->time_used+=jiffies_to_msecs(djiffies);
 		prev->last_sched=jiffies;
+		printk(KERN_INFO "LTF: pid=%d has est time:%lu\n",prev->pid,prev->est_runtime);
 
 		if(prev->time_used>=prev->est_runtime){//if its passed estimated time
 			printk(KERN_INFO "LTF: pid=%d finished\n",prev->pid);
