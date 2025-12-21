@@ -3958,13 +3958,23 @@ need_resched:
 	rcu_note_context_switch(cpu);
 	prev = rq->curr;
 
-	/*assigment4*/
-	if(prev->ltf_flag){
+	/*-----------------------------assigment4-----------------------------*/
+	if(prev->ltf_flag){//updates times for ltf
 		unsigned long djiffies=jiffies-prev->last_sched;
 		prev->time_used+=jiffies_to_msecs(djiffies);
 		prev->last_sched=jiffies;
 		printk(KERN_INFO "LTF: pid=%d time_used=%lu ms\n",prev->pid,prev->time_used);
 
+	}
+	struct task_struct *p;
+	for_each_process(p){
+		if(p->ltf){
+			if(p->time_used>=p->est_runtime){
+				printk(KERN_INFO "LTF: pid=%d finished\n",p->pid);
+				p->time_used=0;
+				p->ltf_flag=0;
+			}
+		}
 	}
 
 	release_kernel_lock(prev);
