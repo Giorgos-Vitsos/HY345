@@ -3953,6 +3953,7 @@ asmlinkage void __sched schedule(void)
 	unsigned long *switch_count;
 	struct rq *rq;
 	int cpu;
+	ltf_runs++;
 	
 need_resched:
 	preempt_disable();
@@ -4045,17 +4046,20 @@ need_resched:
 		}
 	}
 
-	if (candidate && ltf_runs%10!=0){
+	if (candidate && (ltf_runs%10<7)){
 
     	next = candidate;
-		ltf_runs++;
-		clear_tsk_need_resched(prev);
 
 	}else{
     	next = pick_next_task(rq);
+		if(next==rq->idle && candidate){
+			next=candidate;
+		}
+	}
+	if(ltf_runs>=10){
 		ltf_runs=0;
 	}
-
+	
 	release_kernel_lock(prev);
 need_resched_nonpreemptible:
 
