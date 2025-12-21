@@ -3929,6 +3929,22 @@ pick_next_task(struct rq *rq)
 }
 
 /*
+* compute_T() is a helper function for assignment 4
+*/
+
+static inline long compute_T(long remaining,long deadline,long now){
+	if(remaining<=0){
+		return LONG_MAX;
+	}
+	if(deadline<=now){
+		return LONG_MIN;
+	}
+	long remaining_to_deadline=deadline-now;
+	long T=(remaining_to_deadline*1000)/remaining;
+	return T;
+}
+static int ltf_runs;
+/*
  * schedule() is the main scheduler function.
  */
 asmlinkage void __sched schedule(void)
@@ -3953,41 +3969,49 @@ need_resched:
 
 	if(prev->ltf_flag){
 
-		unsigned long djiffies=jiffies-prev->last_sched;//updates times for ltf
-		prev->time_used+=jiffies_to_msecs(djiffies);
+		if(prev->last_sched){//updates times for ltf
+
+			unsigned long d=jiffies-prev->last_sched;
+			prev->time_used+=jiffies_to_msecs(d);
+
+		}
 		prev->last_sched=jiffies;
 
 	}
 
+	read_lock(&tasklist_lock);
 	for_each_process(p){
 
 		if(p->ltf_flag){
 
+			if(p->state!=TASK_RUNNING){
+				continue;
+			}
+
 			long remaining=p->est_runtime-p->time_used;
-			long remaining_to_deadline=p->deadline-now;
 
 			if(remaining<=0){
 
 				printk(KERN_INFO "LTF: pid=%d finished execution\n", p->pid);
-        		force_sig(SIGKILL,p);
+        		send_sig(SIGKILL, p, 0);
 				continue;
 
 			}
 
-			if(remaining_to_deadline<=0){
+			if(p->deadline<=now){
 
 				printk(KERN_INFO "LTF: pid=%d missed deadline\n", p->pid);
-        		force_sig(SIGKILL, p);
+        		send_sig(SIGKILL, p, 0);
         		continue;
 
 			}
 
-			long T=(remaining_to_deadline*1000)/remaining;
+			long T=compute_T(remaining,p->deadline,now);
 
 			if(T<1000){
 
 				printk(KERN_INFO "LTF: pid=%d doomed (T < 1)\n", p->pid);
-            	force_sig(SIGKILL,p);
+            	send_sig(SIGKILL, p, 0);
             	continue;
 
 			}
@@ -4000,28 +4024,37 @@ need_resched:
 			}
 		}
 	}
+	read_unlock(&tasklist_lock);
 
 	if(prev->ltf_flag){
 
 		if(candidate && candidate!=prev){
 
 			long prev_remaining=prev->est_runtime-prev->time_used;
-			long prev_remaining_to_deadline=prev->deadline-now;
-			long prev_T=(prev_remaining_to_deadline*1000)/prev_remaining;
+			if(prev_remaining>0){
+			
+				long prev_T=compute_T(prev_remaining,prev->deadline,now);
 
-			if(min_T<prev_T){
+				if(min_T<prev_T){
 
-				printk(KERN_INFO "Preempting LTF pid=%d for LTF pid=%d\n", prev->pid, candidate->pid);
-        		set_tsk_need_resched(prev);
+					printk(KERN_INFO "Preempting LTF pid=%d for LTF pid=%d\n", prev->pid, candidate->pid);
+        			set_tsk_need_resched(prev);
 
+				}
 			}
 		}
 	}
 
-	if (candidate)
+	if (candidate && ltf_runs%10!=0){
+
     	next = candidate;
-	else
+		ltf_runs++;
+		clear_tsk_need_resched(prev);
+
+	}else{
     	next = pick_next_task(rq);
+		ltf_runs=0;
+	}
 
 	release_kernel_lock(prev);
 need_resched_nonpreemptible:
@@ -4062,7 +4095,6 @@ need_resched_nonpreemptible:
 		idle_balance(cpu, rq);
 
 	put_prev_task(rq, prev);
-	next = pick_next_task(rq);
 	clear_tsk_need_resched(prev);
 	rq->skip_clock_update = 0;
 
