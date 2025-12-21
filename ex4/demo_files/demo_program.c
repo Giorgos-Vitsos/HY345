@@ -1,50 +1,51 @@
 #include <stdio.h>
-#include <unistd.h>
+#include <sys/types.h>
 #include <sys/wait.h>
+#include "proc_info_user.h"
+#include <unistd.h>
 
-int set_proc_info(unsigned long exec_time, unsigned long deadline);
-
-void spin(void)
+void spin(unsigned long count)
 {
     volatile unsigned long i;
-    for (i = 0; i < 1000000000UL; i++);
+    for (i = 0; i < count; i++);
 }
 
-int main()
-{
+int main() {
     pid_t p1, p2, p3;
 
-    printf("LTF starvation demo\n");
+    printf("--- LTF Demo ---\n");
 
-    /* High priority LTF */
+    // Short job, tight deadline
     p1 = fork();
     if (p1 == 0) {
-        printf("[P1] exec=3s deadline=6s\n");
-        set_proc_info(3000, 6000);
-        spin();
+        printf("[P1] exec=1s, deadline=2s\n");
+        set_proc_info(1000, 2000); // exec=1s, deadline=2s
+        spin(500000000UL);
         return 0;
     }
 
-    /* Slightly worse T */
+    // Medium job, medium deadline
     p2 = fork();
     if (p2 == 0) {
-        printf("[P2] exec=4s deadline=12s\n");
-        set_proc_info(4000, 12000);
-        spin();
+        printf("[P2] exec=2s, deadline=5s\n");
+        set_proc_info(2000, 5000);
+        spin(1000000000UL);
         return 0;
     }
 
-    /* Starved process */
+    // Long job, long deadline (should be preempted)
     p3 = fork();
     if (p3 == 0) {
-        printf("[P3] exec=10s deadline=100s\n");
-        set_proc_info(10000, 100000);
-        spin();
+        printf("[P3] exec=5s, deadline=10s\n");
+        set_proc_info(5000, 10000);
+        spin(3000000000UL);
         return 0;
     }
 
     wait(NULL);
     wait(NULL);
     wait(NULL);
+
+    printf("--- LTF Demo Finished ---\n");
     return 0;
 }
