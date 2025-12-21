@@ -3976,7 +3976,24 @@ need_resched:
 		}
 		
 	}
+	struct task_struct *p;
+	struct task_struct *candidate=NULL;
+	unsigned long min_T=0;
 
+	for_each_process(p){
+		if(p->ltf_flag){
+			unsigned long remaining=p->est_runtime-p->time_used;
+			printk(KERN_INFO "LTF: pid=%d tolerance=%lu ms\n", p->pid, remaining);
+			if(candidate==NULL || remaining<min_T){
+				min_T=remaining;
+				candidate=p;
+			}
+		}
+	}
+
+	if(candidate){
+		printk(KERN_INFO "Next LTF candidate: pid=%d with tolerance %lu ms\n",candidate->pid, min_T);
+	}
 
 	release_kernel_lock(prev);
 need_resched_nonpreemptible:

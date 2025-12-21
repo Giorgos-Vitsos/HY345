@@ -1,31 +1,50 @@
+/* 
+ * Giorgos Vitsos csd5369
+ * demo_step8.c
+ */
+
 #include <stdio.h>
-#include <unistd.h>
 #include "proc_info_user.h"
+#include <unistd.h>   // for sleep
+#include <sys/types.h>
+#include <sys/wait.h>
 
 int main() {
-    long result;
-    struct d_params retrieved_params;
+    printf("--- HY-345 Step 8 Demo Program ---\n");
 
-    printf("--- Step 8 LTF Test Demo ---\n");
-
-    // Register a long-running LTF task
-    result = set_proc_info(5, 1000); // 5 s deadline, 1000 ms estimated runtime
-    if (result != 0) {
-        printf("[ERROR] set_proc_info failed\n");
-        return 1;
+    pid_t pid1 = fork();
+    if (pid1 == 0) {
+        // Child 1
+        set_proc_info(5, 2000);  // 5s deadline, 2000ms est
+        while (1); // busy loop to consume CPU
     }
 
-    // Busy loop to simulate CPU usage
-    for (volatile long i = 0; i < 1000000000; i++);
-
-    // Optional: check parameters after busy work
-    result = get_proc_info(&retrieved_params);
-    if (result == 0) {
-        printf("[INFO]: Deadline=%d s, Est_Runtime=%d ms\n",
-               retrieved_params.deadline, retrieved_params.est_runtime);
-    } else {
-        printf("[ERROR] get_proc_info failed\n");
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        // Child 2
+        set_proc_info(5, 1000);  // 5s deadline, 1000ms est
+        while (1); // busy loop
     }
 
+    pid_t pid3 = fork();
+    if (pid3 == 0) {
+        // Child 3
+        set_proc_info(5, 3000);  // 5s deadline, 3000ms est
+        while (1); // busy loop
+    }
+
+    // Parent waits a bit to let LTF scheduling happen
+    sleep(3);
+
+    // Kill children
+    kill(pid1, 9);
+    kill(pid2, 9);
+    kill(pid3, 9);
+
+    waitpid(pid1, NULL, 0);
+    waitpid(pid2, NULL, 0);
+    waitpid(pid3, NULL, 0);
+
+    printf("--- Demo Finished ---\n");
     return 0;
 }
