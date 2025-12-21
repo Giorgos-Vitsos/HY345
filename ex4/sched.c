@@ -3937,19 +3937,6 @@ asmlinkage void __sched schedule(void)
 	unsigned long *switch_count;
 	struct rq *rq;
 	int cpu;
-
-	/*assigment 4 debug*/
-	struct task_struct *p;
-	int found=0;
-	for_each_process(p){
-		if(p->ltf_flag){
-			found=1;
-			break;
-		}
-	}
-	if(found){
-		printk(KERN_INFO"LTF process exists\n");
-	}
 	
 need_resched:
 	preempt_disable();
@@ -3959,40 +3946,76 @@ need_resched:
 	prev = rq->curr;
 
 	/*-----------------------------assigment4-----------------------------*/
+	struct task_struct *p;
+	struct task_struct *candidate=NULL;
+	long min_T=LONG_MAX;
+	long now=jiffies_to_msecs(jiffies);
+
 	if(prev->ltf_flag){
+
 		unsigned long djiffies=jiffies-prev->last_sched;//updates times for ltf
 		prev->time_used+=jiffies_to_msecs(djiffies);
 		prev->last_sched=jiffies;
-		printk(KERN_INFO "LTF: pid=%d has est time:%lu\n",prev->pid,prev->est_runtime);
 
-		if(prev->time_used>=prev->est_runtime){//if its passed estimated time
-			printk(KERN_INFO "LTF: pid=%d finished\n",prev->pid);
-			prev->time_used=0;
-			prev->ltf_flag=0;
-
-		}else{
-			printk(KERN_INFO "LTF: pid=%d time_used=%lu ms\n",prev->pid,prev->time_used);
-
-		}
-		
 	}
-	struct task_struct *p;
-	struct task_struct *candidate=NULL;
-	unsigned long min_T=0;
 
 	for_each_process(p){
+
 		if(p->ltf_flag){
-			unsigned long remaining=p->est_runtime-p->time_used;
-			printk(KERN_INFO "LTF: pid=%d tolerance=%lu ms\n", p->pid, remaining);
-			if(candidate==NULL || remaining<min_T){
-				min_T=remaining;
+
+			long remaining=p->est_runtime-p->time_used;
+			long remaining_to_deadline=p->deadline-now;
+
+			if(remaining<=0){
+
+				printk(KERN_INFO "LTF: pid=%d finished execution\n", p->pid);
+        		force_sig(SIGKILL,p);
+				continue;
+
+			}
+
+			if(remaining_to_deadline<=0){
+
+				printk(KERN_INFO "LTF: pid=%d missed deadline\n", p->pid);
+        		force_sig(SIGKILL, p);
+        		continue;
+
+			}
+
+			long T=(remaining_to_deadline*1000)/remaining;
+
+			if(T<1000){
+
+				printk(KERN_INFO "LTF: pid=%d doomed (T < 1)\n", p->pid);
+            	force_sig(SIGKILL,p);
+            	continue;
+
+			}
+
+			if(candidate==NULL || T<min_T){
+
+				min_T=T;
 				candidate=p;
+
 			}
 		}
 	}
 
-	if(candidate){
-		printk(KERN_INFO "Next LTF candidate: pid=%d with tolerance %lu ms\n",candidate->pid, min_T);
+	if(prev->ltf_flag){
+
+		if(candidate && candidate!=prev){
+
+			long prev_remaining=prev->est_runtime-prev->time_used;
+			long prev_remaining_to_deadline=prev->deadline-now;
+			long prev_T=(prev_remaining_to_deadline*1000)/prev_remaining;
+
+			if(min_T<prev_T){
+
+				printk(KERN_INFO "Preempting LTF pid=%d for LTF pid=%d\n", prev->pid, candidate->pid);
+        		set_tsk_need_resched(prev);
+
+			}
+		}
 	}
 
 	release_kernel_lock(prev);
@@ -4034,9 +4057,15 @@ need_resched_nonpreemptible:
 		idle_balance(cpu, rq);
 
 	put_prev_task(rq, prev);
-	next = pick_next_task(rq);
+	if(candidate){
+		next=candidate;
+	}else{
+		next=pick_next_task(rq);
+	}
 	clear_tsk_need_resched(prev);
 	rq->skip_clock_update = 0;
+
+	
 
 	if (likely(prev != next)) {
 		sched_info_switch(prev, next);
