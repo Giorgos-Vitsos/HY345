@@ -3938,8 +3938,8 @@ asmlinkage void __sched schedule(void)
 	struct rq *rq;
 	int cpu;
 
-	/*start assignment 4-csd5369*/
-	struct task_struct *p
+	/*assigment 4 debug*/
+	struct task_struct *p;
 	int found=0;
 	for_each_process(p){
 		if(p->ltf_flag){
@@ -3948,7 +3948,7 @@ asmlinkage void __sched schedule(void)
 		}
 	}
 	if(found){
-		printk(KERN_INFO "LTF process exists\n");
+		printk(KERN_INFO"LTF process exists\n");
 	}
 	
 need_resched:
@@ -3957,6 +3957,15 @@ need_resched:
 	rq = cpu_rq(cpu);
 	rcu_note_context_switch(cpu);
 	prev = rq->curr;
+
+	/*assigment4*/
+	if(prev->ltf_flag){
+		unsigned long djiffies=jiffies-prev->last_sched;
+		prev->time_used+=jiffies_to_msecs(djiffies);
+		prev->last_sched=jiffies;
+		printk(KERN_INFO "LTF: pid=%d time_used=%lu ms\n",prev->pid,prev->time_used);
+
+	}
 
 	release_kernel_lock(prev);
 need_resched_nonpreemptible:
